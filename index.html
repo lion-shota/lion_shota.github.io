@@ -127,4 +127,17 @@
                     initial: false, // 初期状態で検索バーを表示しない
                     zoom: 15, // 検索結果にジャンプしたときのズームレベル
                     marker: false, // 検索結果を強調するアニメーションマーカーを表示しない
-                    textPlaceholder: '駐屯地名を
+                    textPlaceholder: '駐屯地名を検索...', // プレースホルダーテキスト
+                    position: 'topright' // 地図上の表示位置
+                });
+
+                map.addControl(searchControl);
+            })
+            .catch(error => {
+                console.error('データ処理エラー:', error);
+                alert('地図の表示中にエラーが発生しました。コンソールを確認してください。');
+            });
+    </script>
+
+</body>
+</html>
