@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>陸上自衛隊 駐屯地マップ - 方面隊別</title>
+    <title>陸上自衛隊 駐屯地マップ - 検索機能付き</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-search@1.3.0/dist/leaflet-search.src.css" />
 
     <style>
         /* 必須：地図を表示するコンテナのスタイル */
@@ -15,7 +17,6 @@
         }
 
         /* 方面隊ごとのピンの色の定義（CSS） */
-        /* 各クラス名から「方面隊」の文字を省略しています */
         .jgsdf-pin-北部 { background-color: #007bff; /* 青系 */ }
         .jgsdf-pin-東北 { background-color: #28a745; /* 緑系 */ }
         .jgsdf-pin-東部 { background-color: #ffc107; /* 黄系 */ }
@@ -32,6 +33,11 @@
             border: 2px solid #fff; /* 白い縁取り */
             box-shadow: 0 1px 3px rgba(0,0,0,0.5); /* 影 */
         }
+        
+        /* 検索コントロールの調整 */
+        .leaflet-control-search .search-input {
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -39,6 +45,8 @@
     <div id="mapid"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script src="https://unpkg.com/leaflet-control-search@1.3.0/dist/leaflet-search.src.js"></script>
 
     <script>
         // 1. 地図の初期化
@@ -50,20 +58,17 @@
             attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
+        // ★新規★ 検索対象のマーカーを格納するためのレイヤーグループ
+        var markersLayer = new L.LayerGroup();
+        map.addLayer(markersLayer);
+
         // 方面隊名からCSSクラス名を取得するヘルパー関数
         function getAffiliationClass(affiliation) {
-            // 例: "北部方面隊/第11旅団" -> "北部" の部分を抽出
-            // または "防衛大臣直轄/富士学校" -> "防衛大臣直轄" を抽出
             const area = affiliation.split('/')[0].trim();
-            
-            // "方面隊" の部分を削除し、CSSクラス名の一部として使用
             let className = area.replace('方面隊', '');
-            
-            // "防衛大臣直轄" はそのままクラス名に使用
             if (area === '防衛大臣直轄') {
                 className = '防衛大臣直轄';
             }
-            
             return 'jgsdf-pin-' + className;
         }
 
@@ -71,7 +76,7 @@
         fetch('garrisons.json')
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('駐屯地データ (garrisons.json) の読み込みに失敗しました。ファイルが同階層にあるか確認してください。');
+                    throw new Error('駐屯地データ (garrisons.json) の読み込みに失敗しました。');
                 }
                 return response.json();
             })
@@ -83,7 +88,7 @@
                     var lat = garrison.lat;
                     var lng = garrison.lng;
                     var address = garrison.address;
-                    var affiliation = garrison.affiliation; // 所属情報
+                    var affiliation = garrison.affiliation;
 
                     // 所属に基づいたCSSクラスを取得し、ピンの色を決定
                     const colorClass = getAffiliationClass(affiliation);
@@ -96,22 +101,30 @@
                         iconAnchor: [10, 20]
                     });
 
-                    // マーカーを作成し、地図に追加
-                    var marker = L.marker([lat, lng], {icon: customIcon}).addTo(map);
+                    // マーカーを作成
+                    var marker = L.marker([lat, lng], {
+                        icon: customIcon,
+                        // 検索プラグインのためにマーカーにデータを設定
+                        // 駐屯地名をマーカーのプロパティとして保持
+                        title: name 
+                    });
 
-                    // ポップアップには名前、住所、所属情報を表示
+                    // ポップアップを設定
                     marker.bindPopup(`
                         <b>${name}</b><br>
                         <small style="color: #666;">所属: ${affiliation}</small><br>
                         住所: ${address}
                     `);
+                    
+                    // ★修正★ マーカーを地図ではなく markersLayer に追加
+                    markersLayer.addLayer(marker);
                 });
-            })
-            .catch(error => {
-                console.error('データ処理エラー:', error);
-                alert('地図の表示中にエラーが発生しました。コンソールを確認してください。');
-            });
-    </script>
-
-</body>
-</html>
+                
+                // 4. ★追加★ 検索コントロールの追加 (マーカープロット後に実行)
+                var searchControl = new L.Control.Search({
+                    layer: markersLayer, // 検索対象のレイヤー
+                    propertyName: 'title', // マーカーの "title" 属性を検索対象とする
+                    initial: false, // 初期状態で検索バーを表示しない
+                    zoom: 15, // 検索結果にジャンプしたときのズームレベル
+                    marker: false, // 検索結果を強調するアニメーションマーカーを表示しない
+                    textPlaceholder: '駐屯地名を
